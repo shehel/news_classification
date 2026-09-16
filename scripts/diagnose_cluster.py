@@ -26,19 +26,36 @@ def main():
     print(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES')}")
     print(f"LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}")
 
-    print("\n--- 1. NVIDIA-SMI ---")
+    print("\n--- 1. NVIDIA-SMI (with and without CUDA_VISIBLE_DEVICES) ---")
     try:
         res = subprocess.run(["nvidia-smi"], capture_output=True, text=True)
-        print(res.stdout if res.stdout else res.stderr)
+        print("Default env nvidia-smi:", res.stdout if res.stdout else res.stderr)
     except Exception as e:
         print("nvidia-smi failed:", e)
 
-    print("\n--- 2. Device Node Permissions (/dev/nvidia*) ---")
     try:
-        res = subprocess.run(["ls", "-la", "/dev/nvidia*"], shell=True, capture_output=True, text=True)
-        print(res.stdout if res.stdout else res.stderr)
+        clean_env = os.environ.copy()
+        clean_env.pop("CUDA_VISIBLE_DEVICES", None)
+        res = subprocess.run(["nvidia-smi"], env=clean_env, capture_output=True, text=True)
+        print("Unset CUDA_VISIBLE_DEVICES nvidia-smi:", res.stdout if res.stdout else res.stderr)
     except Exception as e:
-        print("ls /dev/nvidia* failed:", e)
+        print("nvidia-smi unset failed:", e)
+
+    print("\n--- 2. Device Node Listing (/dev) & /proc ---")
+    try:
+        devs = [f for f in os.listdir("/dev") if "nvidia" in f]
+        print("/dev nvidia files:", devs)
+    except Exception as e:
+        print("Listing /dev failed:", e)
+
+    try:
+        if os.path.exists("/proc/driver/nvidia/version"):
+            with open("/proc/driver/nvidia/version") as f:
+                print("/proc/driver/nvidia/version:\n", f.read())
+        else:
+            print("/proc/driver/nvidia/version does not exist")
+    except Exception as e:
+        print("/proc check failed:", e)
 
     print("\n--- 3. Installed PyTorch & NVIDIA Wheels ---")
     try:
