@@ -26,20 +26,27 @@ def main():
     print(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES')}")
     print(f"LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}")
 
-    print("\n--- 1. NVIDIA-SMI (with and without CUDA_VISIBLE_DEVICES) ---")
+    print("\n--- 1. NVIDIA-SMI & /proc/driver/nvidia/gpus ---")
     try:
-        res = subprocess.run(["nvidia-smi"], capture_output=True, text=True)
-        print("Default env nvidia-smi:", res.stdout if res.stdout else res.stderr)
+        if os.path.exists("/proc/driver/nvidia/gpus"):
+            gpus = os.listdir("/proc/driver/nvidia/gpus")
+            print("Found /proc/driver/nvidia/gpus:", gpus)
+            for g in gpus:
+                info_path = f"/proc/driver/nvidia/gpus/{g}/information"
+                if os.path.exists(info_path):
+                    with open(info_path) as f:
+                        print(f"GPU {g} info:\n", f.read())
+        else:
+            print("No /proc/driver/nvidia/gpus directory")
     except Exception as e:
-        print("nvidia-smi failed:", e)
+        print("Checking /proc/driver/nvidia/gpus failed:", e)
 
+    print("\n--- 1b. Kernel dmesg (NVIDIA logs) ---")
     try:
-        clean_env = os.environ.copy()
-        clean_env.pop("CUDA_VISIBLE_DEVICES", None)
-        res = subprocess.run(["nvidia-smi"], env=clean_env, capture_output=True, text=True)
-        print("Unset CUDA_VISIBLE_DEVICES nvidia-smi:", res.stdout if res.stdout else res.stderr)
+        res = subprocess.run("dmesg | grep -i -E 'nvrm|nvidia|xid|pcie' | tail -n 30", shell=True, capture_output=True, text=True)
+        print("dmesg tail:\n", res.stdout if res.stdout else res.stderr)
     except Exception as e:
-        print("nvidia-smi unset failed:", e)
+        print("dmesg failed:", e)
 
     print("\n--- 2. Device Node Permissions & Access Test ---")
     import stat
