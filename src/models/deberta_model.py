@@ -13,6 +13,7 @@ def build_deberta_model(
     model_name: str = DEFAULT_MDEBERTA_MODEL,
     num_classes: Dict[str, int] = None,
     dropout_rate: float = 0.2,
+    gradient_checkpointing: bool = False,
 ) -> tuple[MultiTaskEncoder, AutoTokenizer]:
     """Instantiates the mDeBERTa-v3 multi-task model and tokenizer."""
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -22,5 +23,6 @@ def build_deberta_model(
         use_layer_pooling=True,
         use_msd=True,
         dropout_rate=dropout_rate,
+        gradient_checkpointing=gradient_checkpointing,
     )
     return model, tokenizer

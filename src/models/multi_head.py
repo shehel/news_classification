@@ -51,13 +51,16 @@ class MultiTaskEncoder(nn.Module):
         use_layer_pooling: bool = True,
         use_msd: bool = True,
         dropout_rate: float = 0.2,
+        gradient_checkpointing: bool = False,
     ):
         super().__init__()
         self.config = AutoConfig.from_pretrained(
             model_name_or_path,
             output_hidden_states=True,
         )
-        self.encoder = AutoModel.from_pretrained(model_name_or_path, config=self.config)
+        self.encoder = AutoModel.from_pretrained(model_name_or_path, config=self.config).float()
+        if gradient_checkpointing and hasattr(self.encoder, "gradient_checkpointing_enable"):
+            self.encoder.gradient_checkpointing_enable()
         self.hidden_size = self.config.hidden_size
         self.use_layer_pooling = use_layer_pooling
         self.layer_pooler = LayerWeightedPooling(num_layers=4) if use_layer_pooling else None

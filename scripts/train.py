@@ -72,6 +72,7 @@ def main():
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--use_uncertainty_weighting", action="store_true", default=False)
     parser.add_argument("--fp16", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--gradient_checkpointing", action="store_true", default=False)
 
     # Outputs
     parser.add_argument("--output_dir", type=str, default="experiments/run")
@@ -101,7 +102,9 @@ def main():
         model, tokenizer = build_arabert_model(m_name, num_classes, dropout_rate=args.dropout)
     elif args.model == "mdeberta":
         m_name = args.model_name or "microsoft/mdeberta-v3-base"
-        model, tokenizer = build_deberta_model(m_name, num_classes, dropout_rate=args.dropout)
+        model, tokenizer = build_deberta_model(
+            m_name, num_classes, dropout_rate=args.dropout, gradient_checkpointing=args.gradient_checkpointing
+        )
     elif args.model == "qwen":
         m_name = args.model_name or "Qwen/Qwen3.5-9B"
         model, tokenizer = build_qwen_model(m_name, num_classes, dropout_rate=args.dropout)

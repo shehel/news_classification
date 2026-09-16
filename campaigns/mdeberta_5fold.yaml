@@ -15,11 +15,12 @@ base_task:
   fixed_args:
     model: mdeberta
     epochs: 4
-    batch_size: 8
-    grad_accum: 2
+    batch_size: 4
+    grad_accum: 4
     lr: 1.5e-5
     max_length: 384
     fp16: true
+    gradient_checkpointing: true
     folds_file: folds.csv
 
 grid:

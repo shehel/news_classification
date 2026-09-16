@@ -125,7 +125,8 @@ def main():
         for p in paths:
             test_p_path = os.path.join(p, "test_probs.npz")
             if not os.path.exists(test_p_path):
-                # Check eval subdirectory
+                test_p_path = os.path.join(p, "ood", "test_probs.npz")
+            if not os.path.exists(test_p_path):
                 test_p_path = os.path.join(p, "eval", "test_probs.npz")
             if os.path.exists(test_p_path):
                 tp = load_npz_dict(test_p_path)
