@@ -28,10 +28,13 @@ class QwenMultiTaskClassifier(nn.Module):
     ):
         super().__init__()
         self.config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
-        hidden_size = getattr(self.config, "hidden_size", None) or getattr(self.config, "d_model", 4096)
+        if hasattr(self.config, "text_config") and hasattr(self.config.text_config, "hidden_size"):
+            hidden_size = self.config.text_config.hidden_size
+        else:
+            hidden_size = getattr(self.config, "hidden_size", None) or getattr(self.config, "d_model", 4096)
         self.hidden_size = hidden_size
 
-        torch_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        torch_dtype = torch.bfloat16 if (torch.cuda.is_available() and torch.cuda.is_bf16_supported()) else torch.float16
 
         llm = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
@@ -61,14 +64,20 @@ class QwenMultiTaskClassifier(nn.Module):
         attention_mask: torch.Tensor,
         **kwargs,
     ) -> Dict[str, torch.Tensor]:
-        outputs = self.llm.base_model(
+        outputs = self.llm(
             input_ids=input_ids,
             attention_mask=attention_mask,
             output_hidden_states=True,
             return_dict=True,
         )
 
-        last_hidden_state = outputs.last_hidden_state
+        if hasattr(outputs, "hidden_states") and outputs.hidden_states is not None:
+            last_hidden_state = outputs.hidden_states[-1]
+        elif hasattr(outputs, "last_hidden_state"):
+            last_hidden_state = outputs.last_hidden_state
+        else:
+            raise ValueError(f"Could not extract hidden states from model outputs: {type(outputs)}")
+
         # Extract last non-padding token
         sequence_lengths = attention_mask.sum(dim=1) - 1
         sequence_lengths = torch.clamp(sequence_lengths, min=0)
