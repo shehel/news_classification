@@ -1,0 +1,45 @@
+campaign_id: exp2_mdeberta_5fold
+description: 5-Fold cross validation of mDeBERTa-v3 multi-task model on seneca1.
+project: news_google_challenge
+workdir: .
+seed_arg: seed
+queues: [seneca1]
+
+hypothesis: >
+  mDeBERTa-v3 with disentangled relative attention provides orthogonal representations
+  and complementary syntactic/structural predictions to AraBERT.
+
+base_task:
+  script: scripts/train.py
+  tags: [template:train_mdeberta_5fold]
+  fixed_args:
+    model: mdeberta
+    epochs: 4
+    batch_size: 16
+    lr: 1.5e-5
+    max_length: 512
+    fp16: true
+    folds_file: folds.csv
+
+grid:
+  - name: fold0
+    args: {fold: 0}
+  - name: fold1
+    args: {fold: 1}
+  - name: fold2
+    args: {fold: 2}
+  - name: fold3
+    args: {fold: 3}
+  - name: fold4
+    args: {fold: 4}
+
+seeds: [42]
+
+eval:
+  script: scripts/eval.py
+  tags: [template:eval_mdeberta_5fold]
+  checkpoint_arg: checkpoint_task_id
+  fixed_args:
+    test_file: Test.csv
+    folds_file: folds.csv
+    max_length: 512

@@ -1,0 +1,39 @@
+campaign_id: qwen_smoke
+description: Smoke test of Qwen3.5-9B multi-task LoRA classifier on seneca1.
+project: news_google_challenge
+workdir: .
+seed_arg: seed
+queues: [seneca1]
+
+hypothesis: >
+  Verifies that Qwen3.5-9B with LoRA adaptation can be instantiated on an A100 GPU
+  via clearml-agent and perform training and evaluation without OOM.
+
+base_task:
+  script: scripts/train.py
+  tags: [template:train_qwen]
+  fixed_args:
+    model: qwen
+    epochs: 1
+    batch_size: 4
+    grad_accum: 4
+    lr: 1e-4
+    max_length: 256
+    fp16: true
+    folds_file: folds.csv
+
+grid:
+  - name: smoke_fold0
+    args: {fold: 0}
+
+seeds: [42]
+
+eval:
+  script: scripts/eval.py
+  tags: [template:eval_qwen]
+  checkpoint_arg: checkpoint_task_id
+  fixed_args:
+    test_file: Test.csv
+    folds_file: folds.csv
+    batch_size: 8
+    max_length: 256

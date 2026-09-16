@@ -1,0 +1,45 @@
+campaign_id: exp1_arabert_5fold
+description: 5-Fold cross validation of AraBERTv02 multi-task model on seneca1.
+project: news_google_challenge
+workdir: .
+seed_arg: seed
+queues: [seneca1]
+
+hypothesis: >
+  AraBERTv02 with Multi-Sample Dropout and layer-weighted pooling provides a strong
+  domain-specific Arabic representation across all 6 classification targets.
+
+base_task:
+  script: scripts/train.py
+  tags: [template:train_arabert_5fold]
+  fixed_args:
+    model: arabert
+    epochs: 4
+    batch_size: 16
+    lr: 2e-5
+    max_length: 512
+    fp16: true
+    folds_file: folds.csv
+
+grid:
+  - name: fold0
+    args: {fold: 0}
+  - name: fold1
+    args: {fold: 1}
+  - name: fold2
+    args: {fold: 2}
+  - name: fold3
+    args: {fold: 3}
+  - name: fold4
+    args: {fold: 4}
+
+seeds: [42]
+
+eval:
+  script: scripts/eval.py
+  tags: [template:eval_arabert_5fold]
+  checkpoint_arg: checkpoint_task_id
+  fixed_args:
+    test_file: Test.csv
+    folds_file: folds.csv
+    max_length: 512
