@@ -18,8 +18,6 @@ from src.tracking import (
     write_metrics_json,
 )
 
-_clearml_task = early_init()
-
 import numpy as np
 import pandas as pd
 import torch
@@ -39,6 +37,8 @@ from src.models.qwen_model import build_qwen_model
 
 
 def main():
+    _clearml_task = early_init()
+
     parser = argparse.ArgumentParser(description="Evaluate checkpoint on test set or validation fold")
     add_clearml_args(parser)
 

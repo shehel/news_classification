@@ -18,9 +18,6 @@ from src.tracking import (
     write_metrics_json,
 )
 
-# 1. EARLY INIT before any parse_args() runs
-_clearml_task = early_init()
-
 import numpy as np
 import pandas as pd
 import torch
@@ -50,6 +47,9 @@ def set_seed(seed: int = 42):
 
 
 def main():
+    # 1. EARLY INIT before any parse_args() runs
+    _clearml_task = early_init()
+
     parser = argparse.ArgumentParser(description="Train multi-task Arabic news classifier")
     add_clearml_args(parser)
 
