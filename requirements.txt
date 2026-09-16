@@ -10,5 +10,4 @@ pandas
 numpy
 scikit-learn
 clearml>=2.0.0
-clearml-labkit>=0.1.0
 tqdm
