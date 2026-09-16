@@ -72,6 +72,7 @@ def main():
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--use_uncertainty_weighting", action="store_true", default=False)
     parser.add_argument("--fp16", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--bf16", action="store_true", default=False, help="Use bfloat16 mixed precision")
     parser.add_argument("--gradient_checkpointing", action="store_true", default=False)
 
     # Outputs
@@ -174,13 +175,16 @@ def main():
     warmup_steps = int(total_steps * args.warmup_ratio)
     scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
 
-    scaler = torch.amp.GradScaler("cuda", enabled=args.fp16 and torch.cuda.is_available())
+    use_bf16 = args.bf16 or (args.model == "qwen" and torch.cuda.is_available() and torch.cuda.is_bf16_supported())
+    amp_dtype = torch.bfloat16 if use_bf16 else torch.float16
+    use_scaler = (not use_bf16) and args.fp16 and torch.cuda.is_available()
+    scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
 
     best_mean_f1 = -1.0
     best_metrics = {}
     best_probs = None
 
-    print("\n--- Starting Training ---")
+    print(f"\n--- Starting Training (amp_dtype: {amp_dtype}, scaler: {use_scaler}) ---")
     for epoch in range(1, args.epochs + 1):
         model.train()
         train_loss = 0.0
@@ -195,24 +199,32 @@ def main():
 
             labels_dict = {col: batch["labels"][col].to(device) for col in TARGET_COLUMNS}
 
-            with torch.amp.autocast("cuda", enabled=args.fp16 and torch.cuda.is_available()):
+            with torch.amp.autocast("cuda", dtype=amp_dtype, enabled=torch.cuda.is_available() and (use_bf16 or args.fp16)):
                 logits_dict = model(input_ids, attention_mask, token_type_ids=token_type_ids)
                 loss, _ = loss_fn(logits_dict, labels_dict)
                 if args.grad_accum > 1:
                     loss = loss / args.grad_accum
 
-            scaler.scale(loss).backward()
+            if use_scaler:
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
+
             train_loss += loss.item() * args.grad_accum
 
             if step % args.grad_accum == 0 or step == len(train_loader):
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                scale_before = scaler.get_scale()
-                scaler.step(optimizer)
-                scaler.update()
-                scale_after = scaler.get_scale()
-                # Step scheduler only if optimizer actually stepped (scale didn't decrease due to inf/nan)
-                if scale_before <= scale_after:
+                if use_scaler:
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    scale_before = scaler.get_scale()
+                    scaler.step(optimizer)
+                    scaler.update()
+                    scale_after = scaler.get_scale()
+                    if scale_before <= scale_after:
+                        scheduler.step()
+                else:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    optimizer.step()
                     scheduler.step()
                 optimizer.zero_grad()
 
