@@ -41,21 +41,37 @@ def main():
     except Exception as e:
         print("nvidia-smi unset failed:", e)
 
-    print("\n--- 2. Device Node Listing (/dev) & /proc ---")
-    try:
-        devs = [f for f in os.listdir("/dev") if "nvidia" in f]
-        print("/dev nvidia files:", devs)
-    except Exception as e:
-        print("Listing /dev failed:", e)
+    print("\n--- 2. Device Node Permissions & Access Test ---")
+    import stat
+    for dev in sorted(os.listdir("/dev")):
+        if "nvidia" in dev:
+            dev_path = os.path.join("/dev", dev)
+            try:
+                st = os.stat(dev_path)
+                mode = oct(stat.S_IMODE(st.st_mode))
+                print(f"  {dev_path}: mode={mode} uid={st.st_uid} gid={st.st_gid}")
+                with open(dev_path, "rb") as f:
+                    pass
+                print(f"    -> Can read {dev_path}: YES")
+            except Exception as e:
+                print(f"    -> Access {dev_path} FAILED: {type(e).__name__} {e}")
 
+    print("\n--- 2b. Singularity libraries (/.singularity.d/libs) ---")
+    if os.path.exists("/.singularity.d/libs"):
+        libs = [f for f in os.listdir("/.singularity.d/libs") if "cuda" in f or "nvidia" in f]
+        print("Singularity cuda/nvidia libs:", libs[:15])
+        for lib in libs[:5]:
+            lib_path = os.path.join("/.singularity.d/libs", lib)
+            print(f"  {lib} -> {os.path.realpath(lib_path)}")
+    else:
+        print("No /.singularity.d/libs directory")
+
+    print("\n--- 2c. strace / debug nvidia-smi ---")
     try:
-        if os.path.exists("/proc/driver/nvidia/version"):
-            with open("/proc/driver/nvidia/version") as f:
-                print("/proc/driver/nvidia/version:\n", f.read())
-        else:
-            print("/proc/driver/nvidia/version does not exist")
+        res = subprocess.run(["nvidia-smi", "-q"], capture_output=True, text=True)
+        print("nvidia-smi -q output:\n", res.stdout[:500] if res.stdout else res.stderr[:500])
     except Exception as e:
-        print("/proc check failed:", e)
+        print("nvidia-smi -q failed:", e)
 
     print("\n--- 3. Installed PyTorch & NVIDIA Wheels ---")
     try:
