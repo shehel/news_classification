@@ -25,6 +25,7 @@ class QwenMultiTaskClassifier(nn.Module):
         lora_dropout: float = 0.05,
         dropout_rate: float = 0.2,
         load_in_4bit: bool = False,
+        gradient_checkpointing: bool = False,
     ):
         super().__init__()
         self.config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
@@ -42,7 +43,16 @@ class QwenMultiTaskClassifier(nn.Module):
             trust_remote_code=True,
         )
 
-        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+        if gradient_checkpointing:
+            llm.gradient_checkpointing_enable()
+            if hasattr(llm, "enable_input_require_grads"):
+                llm.enable_input_require_grads()
+
+        target_modules = [
+            "q_proj", "k_proj", "v_proj", "o_proj",
+            "gate_proj", "up_proj", "down_proj",
+            "in_proj_qkv", "out_proj", "in_proj_z", "in_proj_b", "in_proj_a",
+        ]
         peft_config = LoraConfig(
             task_type=TaskType.FEATURE_EXTRACTION,
             r=lora_r,
@@ -94,11 +104,13 @@ def build_qwen_model(
     lora_r: int = 16,
     lora_alpha: int = 32,
     dropout_rate: float = 0.2,
+    gradient_checkpointing: bool = False,
 ) -> tuple[QwenMultiTaskClassifier, AutoTokenizer]:
     """Instantiates Qwen model with LoRA and tokenizer."""
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
 
     model = QwenMultiTaskClassifier(
         model_name_or_path=model_name,
@@ -106,5 +118,6 @@ def build_qwen_model(
         lora_r=lora_r,
         lora_alpha=lora_alpha,
         dropout_rate=dropout_rate,
+        gradient_checkpointing=gradient_checkpointing,
     )
     return model, tokenizer

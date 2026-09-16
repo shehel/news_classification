@@ -100,7 +100,7 @@ def main():
     else:
         raise ValueError(f"Unknown model: {model_type}")
 
-    model.load_state_dict(checkpoint["model_state_dict"])
+    model.load_state_dict(checkpoint["model_state_dict"], strict=False)
     model.to(device)
     model.eval()
 

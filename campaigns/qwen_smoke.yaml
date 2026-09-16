@@ -20,6 +20,8 @@ base_task:
     lr: 1e-4
     max_length: 256
     bf16: true
+    gradient_checkpointing: true
+    max_steps: 20
     folds_file: folds.csv
 
 grid:

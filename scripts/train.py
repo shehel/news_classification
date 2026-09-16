@@ -74,6 +74,7 @@ def main():
     parser.add_argument("--fp16", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--bf16", action="store_true", default=False, help="Use bfloat16 mixed precision")
     parser.add_argument("--gradient_checkpointing", action="store_true", default=False)
+    parser.add_argument("--max_steps", type=int, default=-1, help="Max optimization steps (-1 for full epochs)")
 
     # Outputs
     parser.add_argument("--output_dir", type=str, default="experiments/run")
@@ -108,7 +109,9 @@ def main():
         )
     elif args.model == "qwen":
         m_name = args.model_name or "Qwen/Qwen3.5-9B"
-        model, tokenizer = build_qwen_model(m_name, num_classes, dropout_rate=args.dropout)
+        model, tokenizer = build_qwen_model(
+            m_name, num_classes, dropout_rate=args.dropout, gradient_checkpointing=args.gradient_checkpointing
+        )
     else:
         raise ValueError(f"Unknown model: {args.model}")
 
@@ -183,9 +186,13 @@ def main():
     best_mean_f1 = -1.0
     best_metrics = {}
     best_probs = None
+    global_step = 0
+    stop_training = False
 
     print(f"\n--- Starting Training (amp_dtype: {amp_dtype}, scaler: {use_scaler}) ---")
     for epoch in range(1, args.epochs + 1):
+        if stop_training:
+            break
         model.train()
         train_loss = 0.0
         optimizer.zero_grad()
@@ -227,8 +234,14 @@ def main():
                     optimizer.step()
                     scheduler.step()
                 optimizer.zero_grad()
+                global_step += 1
 
-        avg_train_loss = train_loss / len(train_loader)
+                if args.max_steps > 0 and global_step >= args.max_steps:
+                    print(f"[train] Reached max_steps={args.max_steps} at step {step}, stopping epoch.")
+                    stop_training = True
+                    break
+
+        avg_train_loss = train_loss / (step if stop_training else len(train_loader))
 
         # Validation
         val_metrics, val_probs, val_targets = evaluate_model(model, val_loader, device, loss_fn=loss_fn)
@@ -255,11 +268,13 @@ def main():
             best_metrics = val_metrics.copy()
             best_probs = val_probs
 
-            # Save checkpoint
+            # Save checkpoint (trainable parameters only for lightweight LoRA storage)
             ckpt_path = os.path.join(args.output_dir, "best_model.pt")
+            trainable_names = {n for n, p in model.named_parameters() if p.requires_grad}
+            state_dict = {k: v.cpu() for k, v in model.state_dict().items() if k in trainable_names}
             torch.save(
                 {
-                    "model_state_dict": model.state_dict(),
+                    "model_state_dict": state_dict,
                     "epoch": epoch,
                     "mean_f1": best_mean_f1,
                     "metrics": best_metrics,
