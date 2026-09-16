@@ -1,9 +1,9 @@
 campaign_id: exp2_mdeberta_5fold
-description: 5-Fold cross validation of mDeBERTa-v3 multi-task model on seneca1.
+description: 5-Fold cross validation of mDeBERTa-v3 multi-task model on local GPU.
 project: news_google_challenge
 workdir: .
 seed_arg: seed
-queues: [seneca1]
+queues: [local]
 
 hypothesis: >
   mDeBERTa-v3 with disentangled relative attention provides orthogonal representations
@@ -15,9 +15,10 @@ base_task:
   fixed_args:
     model: mdeberta
     epochs: 4
-    batch_size: 16
+    batch_size: 8
+    grad_accum: 2
     lr: 1.5e-5
-    max_length: 512
+    max_length: 384
     fp16: true
     folds_file: folds.csv
 
@@ -42,4 +43,4 @@ eval:
   fixed_args:
     test_file: Test.csv
     folds_file: folds.csv
-    max_length: 512
+    max_length: 384

@@ -60,9 +60,19 @@ def main():
 
     # Resolve checkpoint
     ckpt_file = args.checkpoint_path
-    if args.checkpoint_task_id:
-        print(f"[eval] Fetching checkpoint from ClearML task {args.checkpoint_task_id}...")
-        ckpt_file = fetch_task_artifact(args.checkpoint_task_id, "best_checkpoint")
+    if not ckpt_file and args.checkpoint_task_id:
+        # Check if local experiments directory already has best_model.pt
+        parent_dir = str(Path(args.output_dir).parent)
+        local_cand = os.path.join(parent_dir, "best_model.pt")
+        if os.path.exists(local_cand):
+            ckpt_file = local_cand
+            print(f"[eval] Using existing local checkpoint: {ckpt_file}")
+        else:
+            try:
+                print(f"[eval] Fetching checkpoint from ClearML task {args.checkpoint_task_id}...")
+                ckpt_file = fetch_task_artifact(args.checkpoint_task_id, "best_checkpoint")
+            except Exception as e:
+                print(f"[eval] Warning fetching artifact: {e}")
 
     if not ckpt_file or not os.path.exists(ckpt_file):
         raise FileNotFoundError(f"Checkpoint file not found: {ckpt_file}")
