@@ -126,6 +126,8 @@ def early_init(argv: Optional[list] = None, task_name: Optional[str] = None) -> 
         task_name=resolved_name,
         auto_connect_frameworks={"pytorch": False},
     )
+    if os.path.exists("requirements.txt"):
+        task.set_packages("./requirements.txt")
     if ns.clearml_tags:
         task.set_tags([t.strip() for t in ns.clearml_tags.split(",") if t.strip()])
     if ns.clearml_comment:
