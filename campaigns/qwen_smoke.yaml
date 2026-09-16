@@ -19,7 +19,7 @@ base_task:
     grad_accum: 4
     lr: 1e-4
     max_length: 256
-    fp16: true
+    bf16: true
     folds_file: folds.csv
 
 grid:
